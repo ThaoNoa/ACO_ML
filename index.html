@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="SmartRoute - Hệ thống Điều phối Logistics Thích ứng sử dụng ACO kết hợp Q-Learning giải quyết bài toán Dynamic TSP" />
+  <title>SmartRoute — Điều phối Logistics Thích ứng | ACO + Q-Learning</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ================================================================
+       HEADER
+       ================================================================ -->
+  <header id="app-header">
+    <div class="header-logo">
+      <div class="logo-icon">🐜</div>
+      <div>
+        <div class="logo-text">SmartRoute</div>
+        <div class="logo-sub">Điều phối Logistics Thích ứng</div>
+      </div>
+    </div>
+
+    <div class="header-divider"></div>
+
+    <div class="header-stats">
+      <div class="h-stat">
+        <div class="h-stat-label">Nodes</div>
+        <div class="h-stat-value">20</div>
+      </div>
+      <div class="h-stat">
+        <div class="h-stat-label">Kiến / Gen</div>
+        <div class="h-stat-value">30</div>
+      </div>
+      <div class="h-stat">
+        <div class="h-stat-label">Thuật toán</div>
+        <div class="h-stat-value" style="font-size:11px;color:#4a9eff;">ACO + Q-Learning</div>
+      </div>
+    </div>
+
+    <div class="header-version">v2.0 · Dynamic TSP</div>
+  </header>
+
+  <!-- ================================================================
+       MAIN CANVAS (60%)
+       ================================================================ -->
+  <section id="canvas-section">
+    <div id="canvas-container">
+      <canvas id="main-canvas"></canvas>
+    </div>
+  </section>
+
+  <!-- ================================================================
+       CHAOS PANEL (15%) — Bảng điều khiển Sự cố
+       ================================================================ -->
+  <aside id="chaos-panel">
+    <div class="panel-title">Điều khiển</div>
+
+    <!-- Nút Start/Pause -->
+    <button id="btn-start-pause" class="btn" title="Bắt đầu hoặc tạm dừng mô phỏng">
+      ▶ Bắt đầu
+    </button>
+
+    <!-- Nút tạo tắc đường -->
+    <button id="btn-block-tool" class="btn" title="Kích hoạt để click vào cạnh trên bản đồ và tạo tắc đường">
+      🚧 Tạo Tắc Đường
+    </button>
+
+    <!-- Nút Reset -->
+    <button id="btn-reset" class="btn" title="Khởi tạo lại toàn bộ mô phỏng">
+      🔄 Khởi tạo lại
+    </button>
+
+    <div class="panel-title" style="margin-top:4px;">Hướng dẫn</div>
+
+    <div class="chaos-info">
+      <p>1. Nhấn <strong style="color:#00d68f">▶ Bắt đầu</strong> để chạy mô phỏng.</p>
+      <div class="tip">Đàn kiến sẽ tự tìm lộ trình ngắn nhất.</div>
+    </div>
+
+    <div class="chaos-info">
+      <p>2. Nhấn <strong style="color:#ff3b3b">🚧 Tắc Đường</strong>, sau đó click vào một cạnh trên bản đồ.</p>
+      <div class="tip">Chi phí cạnh đó ×100, AI sẽ phản ứng!</div>
+    </div>
+
+    <div class="panel-title" style="margin-top:4px;">Chú thích</div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-line" style="background:#ffd700;"></div>
+        <span>Lộ trình tốt nhất</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:rgba(0,200,120,0.7);"></div>
+        <span>Mức pheromone</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line" style="background:#ff3b3b;"></div>
+        <span>Cạnh tắc đường</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#ff6b35;"></div>
+        <span>Kho hàng (Depot)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#4a9eff;"></div>
+        <span>Điểm giao hàng</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================================================================
+       ANALYTICS PANEL (25%) — Bảng phân tích AI
+       ================================================================ -->
+  <aside id="analytics-panel">
+
+    <!-- Trạng thái đàn kiến -->
+    <div class="state-section">
+      <div class="panel-title">Trạng thái AI</div>
+      <div id="state-badge" class="state-badge state-ok">
+        <div class="state-indicator"></div>
+        <span id="state-label">BÌNH THƯỜNG</span>
+      </div>
+    </div>
+
+    <!-- Thông số ACO -->
+    <div>
+      <div class="panel-title">Thông số ACO (Live)</div>
+      <div class="params-grid">
+        <div class="param-card">
+          <div class="param-label">α Alpha</div>
+          <div class="param-value" id="param-alpha">1.00</div>
+        </div>
+        <div class="param-card">
+          <div class="param-label">ρ Rho</div>
+          <div class="param-value" id="param-rho">0.10</div>
+        </div>
+        <div class="param-card">
+          <div class="param-label">ε Epsilon</div>
+          <div class="param-value" id="param-epsilon" style="font-size:13px;">0.200</div>
+        </div>
+        <div class="param-card">
+          <div class="param-label">Kiến / Gen</div>
+          <div class="param-value" style="font-size:14px;">30</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Số liệu chính -->
+    <div>
+      <div class="panel-title">Tiến trình</div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Thế hệ</div>
+          <div class="stat-value" id="gen-number">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Best Dist</div>
+          <div class="stat-value" id="best-dist">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quyết định AI -->
+    <div>
+      <div class="panel-title">Quyết định Q-Learning</div>
+      <div class="ai-decision-row">
+        <div class="decision-card">
+          <div class="decision-label">Hành động</div>
+          <div class="decision-value" id="current-action">—</div>
+        </div>
+        <div class="decision-card">
+          <div class="decision-label">Reward</div>
+          <div class="value reward-pos" id="last-reward">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line Chart -->
+    <div class="chart-section">
+      <div class="panel-title">Biểu đồ Hội tụ</div>
+      <div class="chart-wrapper">
+        <canvas id="line-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Q-Table mini -->
+    <div class="qtable-section">
+      <div class="panel-title">Q-Table (Trạng thái hiện tại tô sáng)</div>
+      <div id="qtable-display">
+        <!-- Được điền bởi app.js -->
+      </div>
+    </div>
+
+  </aside>
+
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<!-- JavaScript Modules -->
+<script type="module" src="js/app.js"></script>
+
+</body>
+</html>
