@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="SmartRoute - Hệ thống Điều phối Logistics Thích ứng sử dụng ACO kết hợp Q-Learning giải quyết bài toán Dynamic TSP" />
-  <title>SmartRoute — Điều phối Logistics Thích ứng | ACO + Q-Learning</title>
+  <meta name="description" content="SmartRoute v3 — Hệ thống Điều phối Logistics Thích ứng dùng ACO + Q-Learning / DDPG giải bài toán Dynamic TSP" />
+  <title>SmartRoute v3 — ACO + Q-Learning / DDPG</title>
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
-  <!-- Chart.js CDN -->
+  <!-- Chart.js CDN (giữ nguyên, không bundle) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <!-- Stylesheet -->
@@ -45,15 +45,23 @@
       </div>
       <div class="h-stat">
         <div class="h-stat-label">Thuật toán</div>
-        <div class="h-stat-value" style="font-size:11px;color:#4a9eff;">ACO + Q-Learning</div>
+        <div class="h-stat-value algo-value" id="algo-label">ACO + Q-Learning</div>
       </div>
     </div>
 
-    <div class="header-version">v2.0 · Dynamic TSP</div>
+    <!-- MODE SWITCH BUTTON -->
+    <button id="btn-mode-switch" class="mode-btn mode-ql" title="Chuyển đổi giữa Q-Learning và DDPG">
+      <span class="mode-icon">🧠</span>
+      <span class="mode-label">Q-Learning</span>
+      <span class="mode-sep">|</span>
+      <span class="mode-arrow">→ DDPG</span>
+    </button>
+
+    <div class="header-version">v3.0 · Dynamic TSP</div>
   </header>
 
   <!-- ================================================================
-       MAIN CANVAS (60%)
+       MAIN CANVAS
        ================================================================ -->
   <section id="canvas-section">
     <div id="canvas-container">
@@ -62,24 +70,45 @@
   </section>
 
   <!-- ================================================================
-       CHAOS PANEL (15%) — Bảng điều khiển Sự cố
+       CHAOS PANEL — Điều khiển
        ================================================================ -->
   <aside id="chaos-panel">
     <div class="panel-title">Điều khiển</div>
 
-    <!-- Nút Start/Pause -->
     <button id="btn-start-pause" class="btn" title="Bắt đầu hoặc tạm dừng mô phỏng">
       ▶ Bắt đầu
     </button>
 
-    <!-- Nút tạo tắc đường -->
     <button id="btn-block-tool" class="btn" title="Kích hoạt để click vào cạnh trên bản đồ và tạo tắc đường">
       🚧 Tạo Tắc Đường
     </button>
+    <button id="btn-clear-traffic" class="btn btn-outline" style="border-color: var(--color-danger); color: var(--color-danger);" title="Xoá tất cả các điểm tắc đường">
+      ❌ Xoá Tắc Đường
+    </button>
 
-    <!-- Nút Reset -->
     <button id="btn-reset" class="btn" title="Khởi tạo lại toàn bộ mô phỏng">
       🔄 Khởi tạo lại
+    </button>
+
+    <div class="panel-title" style="margin-top:4px;">Huấn luyện & Đánh giá</div>
+    
+    <button id="btn-train-fast" class="btn btn-purple" title="Huấn luyện DDPG tốc độ cao (Headless)">
+      ⚡ Train DDPG (Fast)
+    </button>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+      <button id="btn-export-model" class="btn btn-outline" title="Lưu trọng số mô hình DDPG">
+        💾 Export
+      </button>
+      <button id="btn-import-model" class="btn btn-outline" title="Tải trọng số mô hình DDPG">
+        📂 Import
+      </button>
+      <input type="file" id="file-import-json" accept=".json" style="display:none;" />
+      <input type="file" id="file-import-bin" accept=".bin" style="display:none;" />
+    </div>
+
+    <button id="btn-run-test-suite" class="btn btn-gold" title="Chạy bộ 5 test cases và so sánh QL vs DDPG">
+      📊 Run Test Suite
     </button>
 
     <div class="panel-title" style="margin-top:4px;">Hướng dẫn</div>
@@ -92,6 +121,11 @@
     <div class="chaos-info">
       <p>2. Nhấn <strong style="color:#ff3b3b">🚧 Tắc Đường</strong>, sau đó click vào một cạnh trên bản đồ.</p>
       <div class="tip">Chi phí cạnh đó ×100, AI sẽ phản ứng!</div>
+    </div>
+
+    <div class="chaos-info">
+      <p>3. Nhấn <strong style="color:#a78bfa">🧠 Mode Switch</strong> để chuyển giữa Q-Learning ↔ DDPG.</p>
+      <div class="tip">DDPG điều chỉnh α, ρ liên tục — mịn hơn.</div>
     </div>
 
     <div class="panel-title" style="margin-top:4px;">Chú thích</div>
@@ -121,20 +155,11 @@
   </aside>
 
   <!-- ================================================================
-       ANALYTICS PANEL (25%) — Bảng phân tích AI
+       ANALYTICS PANEL
        ================================================================ -->
   <aside id="analytics-panel">
 
-    <!-- Trạng thái đàn kiến -->
-    <div class="state-section">
-      <div class="panel-title">Trạng thái AI</div>
-      <div id="state-badge" class="state-badge state-ok">
-        <div class="state-indicator"></div>
-        <span id="state-label">BÌNH THƯỜNG</span>
-      </div>
-    </div>
-
-    <!-- Thông số ACO -->
+    <!-- Thông số ACO (Live) — luôn hiện -->
     <div>
       <div class="panel-title">Thông số ACO (Live)</div>
       <div class="params-grid">
@@ -147,7 +172,7 @@
           <div class="param-value" id="param-rho">0.10</div>
         </div>
         <div class="param-card">
-          <div class="param-label">ε Epsilon</div>
+          <div class="param-label">ε / σ Noise</div>
           <div class="param-value" id="param-epsilon" style="font-size:13px;">0.200</div>
         </div>
         <div class="param-card">
@@ -157,7 +182,7 @@
       </div>
     </div>
 
-    <!-- Số liệu chính -->
+    <!-- Tiến trình — luôn hiện -->
     <div>
       <div class="panel-title">Tiến trình</div>
       <div class="stats-row">
@@ -172,22 +197,116 @@
       </div>
     </div>
 
-    <!-- Quyết định AI -->
-    <div>
-      <div class="panel-title">Quyết định Q-Learning</div>
-      <div class="ai-decision-row">
-        <div class="decision-card">
-          <div class="decision-label">Hành động</div>
-          <div class="decision-value" id="current-action">—</div>
-        </div>
-        <div class="decision-card">
-          <div class="decision-label">Reward</div>
-          <div class="value reward-pos" id="last-reward">—</div>
+    <!-- ============================================================
+         Q-LEARNING PANEL (ẩn khi DDPG mode)
+         ============================================================ -->
+    <div id="ql-panel">
+
+      <!-- Trạng thái AI -->
+      <div class="state-section">
+        <div class="panel-title">Trạng thái AI</div>
+        <div id="state-badge" class="state-badge state-ok">
+          <div class="state-indicator"></div>
+          <span id="state-label">BÌNH THƯỜNG</span>
         </div>
       </div>
-    </div>
 
-    <!-- Line Chart -->
+      <!-- Quyết định -->
+      <div>
+        <div class="panel-title">Quyết định Q-Learning</div>
+        <div class="ai-decision-row">
+          <div class="decision-card">
+            <div class="decision-label">Hành động</div>
+            <div class="decision-value" id="current-action">—</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label">Reward</div>
+            <div class="value reward-pos" id="last-reward">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Q-Table -->
+      <div class="qtable-section">
+        <div class="panel-title">Q-Table (Trạng thái hiện tại tô sáng)</div>
+        <div id="qtable-display"></div>
+      </div>
+
+    </div><!-- #ql-panel -->
+
+    <!-- ============================================================
+         DDPG PANEL (ẩn khi Q-Learning mode)
+         ============================================================ -->
+    <div id="ddpg-panel" class="panel-hidden">
+
+      <!-- Action Gauges -->
+      <div>
+        <div class="panel-title">Action Output (Liên tục)</div>
+        <div class="ddpg-gauges">
+
+          <div class="gauge-wrap">
+            <div class="gauge-header">
+              <span class="gauge-label">α Alpha</span>
+              <span class="gauge-range">0.3 → 2.5</span>
+              <span class="gauge-val" id="val-alpha">1.000</span>
+            </div>
+            <div class="gauge-track">
+              <div class="gauge-fill gauge-alpha" id="gauge-alpha" style="width:32%"></div>
+            </div>
+          </div>
+
+          <div class="gauge-wrap">
+            <div class="gauge-header">
+              <span class="gauge-label">ρ Rho</span>
+              <span class="gauge-range">0.02 → 0.90</span>
+              <span class="gauge-val" id="val-rho">0.100</span>
+            </div>
+            <div class="gauge-track">
+              <div class="gauge-fill gauge-rho" id="gauge-rho" style="width:10%"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Training Stats -->
+      <div>
+        <div class="panel-title">DDPG Training</div>
+        <div class="training-grid">
+          <div class="train-card">
+            <div class="train-label">Critic Loss</div>
+            <div class="train-val" id="critic-loss">—</div>
+          </div>
+          <div class="train-card">
+            <div class="train-label">Actor Loss</div>
+            <div class="train-val" id="actor-loss">—</div>
+          </div>
+          <div class="train-card">
+            <div class="train-label">Buffer</div>
+            <div class="train-val value" id="buffer-fill">0/5000</div>
+          </div>
+          <div class="train-card">
+            <div class="train-label">OU Noise σ</div>
+            <div class="train-val" id="ou-noise">0.300</div>
+          </div>
+        </div>
+        <div class="ddpg-reward-row">
+          <span class="train-label">Reward:</span>
+          <span class="value reward-pos" id="ddpg-reward">—</span>
+        </div>
+      </div>
+
+      <!-- State Vector -->
+      <div>
+        <div class="panel-title">State Vector (10D)</div>
+        <div id="state-vec-display" class="state-vec-grid">
+          <!-- Điền bởi app.js -->
+        </div>
+      </div>
+
+    </div><!-- #ddpg-panel -->
+
+    <!-- Line Chart — luôn hiện -->
     <div class="chart-section">
       <div class="panel-title">Biểu đồ Hội tụ</div>
       <div class="chart-wrapper">
@@ -195,23 +314,57 @@
       </div>
     </div>
 
-    <!-- Q-Table mini -->
-    <div class="qtable-section">
-      <div class="panel-title">Q-Table (Trạng thái hiện tại tô sáng)</div>
-      <div id="qtable-display">
-        <!-- Được điền bởi app.js -->
-      </div>
-    </div>
-
   </aside>
 
+</div>
+
+<!-- ================================================================
+     TEST SUITE MODAL
+     ================================================================ -->
+<div id="test-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">📊 Test Suite Results: QL-ACO vs DDPG</h2>
+      <button id="btn-close-modal" class="btn-close">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Bảng kết quả -->
+      <table class="test-table">
+        <thead>
+          <tr>
+            <th>Test Case</th>
+            <th>Optimal (Brute-force)</th>
+            <th colspan="2">QL-ACO (Tabular)</th>
+            <th colspan="2">DDPG (Deep RL)</th>
+          </tr>
+          <tr>
+            <th></th>
+            <th></th>
+            <th>Best Cost</th>
+            <th>Error %</th>
+            <th>Best Cost</th>
+            <th>Error %</th>
+          </tr>
+        </thead>
+        <tbody id="test-table-body">
+          <!-- Rendered via JS -->
+        </tbody>
+      </table>
+
+      <!-- Biểu đồ so sánh -->
+      <div class="modal-chart-container">
+        <canvas id="test-compare-chart"></canvas>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Toast notification -->
 <div id="toast"></div>
 
-<!-- JavaScript Modules -->
-<script type="module" src="js/app.js"></script>
+<!-- JavaScript Entry (Vite sẽ bundle) -->
+<script type="module" src="/js/app.js"></script>
 
 </body>
 </html>

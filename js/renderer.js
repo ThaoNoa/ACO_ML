@@ -386,7 +386,8 @@ export class Renderer {
     ctx.fillStyle = 'rgba(255,215,0,0.9)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(`Gen ${generation} | Best: ${cost.toFixed(1)}px`, 12, 12);
+    const displayCost = cost < Infinity ? `${cost.toFixed(1)}px` : '—';
+    ctx.fillText(`Gen ${generation} | Best: ${displayCost}`, 12, 12);
   }
 
   /**

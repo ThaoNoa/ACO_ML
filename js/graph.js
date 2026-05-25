@@ -128,6 +128,19 @@ export class Graph {
   }
 
   /**
+   * Xoá toàn bộ tắc đường
+   */
+  clearAllBlockedEdges() {
+    this.blockedEdges.clear();
+    const n = this.nodes.length;
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        this.costs[i][j] = this.distances[i][j];
+      }
+    }
+  }
+
+  /**
    * Kiểm tra cạnh có bị tắc không
    */
   isEdgeBlocked(i, j) {
