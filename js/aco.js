@@ -15,7 +15,7 @@ export class ACOEngine {
 
     // Tham số mặc định - sẽ bị Q-Learning điều chỉnh
     this.alpha = config.alpha ?? 1.0;   // Trọng số Pheromone
-    this.beta  = config.beta  ?? 2.0;   // Trọng số Heuristic (nghịch đảo khoảng cách)
+    this.beta  = config.beta  ?? 2.0;   // Trọng số Heuristic phục hồi mức 2.0
     this.rho   = config.rho   ?? 0.1;   // Tốc độ bay hơi
     this.numAnts = config.numAnts ?? 30;
 

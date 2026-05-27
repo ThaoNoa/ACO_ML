@@ -392,6 +392,7 @@ export class Renderer {
 
   /**
    * Tìm cạnh gần nhất với điểm click (dùng cho chức năng tắc đường)
+   * Tìm trên TOÀN BỘ đồ thị — giữ lại để tương thích nội bộ
    * @returns {{ i, j } | null}
    */
   findNearestEdge(graph, mouseX, mouseY, threshold = 15) {
@@ -413,6 +414,46 @@ export class Renderer {
       }
     }
     return nearest;
+  }
+
+  /**
+   * Tìm cạnh gần nhất CHỈ TRONG CÁC CẠNH THUỘC bestPath
+   * Dùng cho chức năng tắc đường — người dùng chỉ chặn được cạnh trên lộ trình tối ưu
+   * @param {import('./graph.js').Graph} graph
+   * @param {number[]|null} bestPath - Lộ trình tốt nhất hiện tại
+   * @param {number} mouseX
+   * @param {number} mouseY
+   * @param {number} threshold - Khoảng cách pixel tối đa để coi là click trúng
+   * @returns {{ i: number, j: number } | null}
+   */
+  findNearestEdgeOnPath(graph, bestPath, mouseX, mouseY, threshold = 18) {
+    if (!bestPath || bestPath.length < 2) return null;
+
+    let minDist = threshold;
+    let nearest = null;
+
+    for (let k = 0; k < bestPath.length - 1; k++) {
+      const a = bestPath[k];
+      const b = bestPath[k + 1];
+      const d = this._pointToSegmentDist(
+        mouseX, mouseY,
+        graph.nodes[a].x, graph.nodes[a].y,
+        graph.nodes[b].x, graph.nodes[b].y
+      );
+      if (d < minDist) {
+        minDist = d;
+        nearest = { i: Math.min(a, b), j: Math.max(a, b) };
+      }
+    }
+    return nearest;
+  }
+
+  /**
+   * Kiểm tra xem (mouseX, mouseY) có đang hover lên cạnh thuộc bestPath không
+   * Dùng để đổi cursor khi ở block-tool mode
+   */
+  isHoveringPathEdge(graph, bestPath, mouseX, mouseY, threshold = 15) {
+    return this.findNearestEdgeOnPath(graph, bestPath, mouseX, mouseY, threshold) !== null;
   }
 
   /**

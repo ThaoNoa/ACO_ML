@@ -21,7 +21,7 @@ import { Evaluator }       from './evaluator.js';
 // =====================================================================
 // CONSTANTS
 // =====================================================================
-const NUM_NODES     = 20;
+const NUM_NODES     = 40; // Tăng lên 40 thành phố để trình diễn hoành tráng
 const NUM_ANTS      = 30;
 const MS_PER_GEN    = 120;
 const PARTICLE_RATE = 3;
@@ -68,6 +68,7 @@ const mainCanvas      = document.getElementById('main-canvas');
 const btnStartPause   = document.getElementById('btn-start-pause');
 const btnBlockTool    = document.getElementById('btn-block-tool');
 const btnReset        = document.getElementById('btn-reset');
+const btnRestartMap   = document.getElementById('btn-restart-map');
 const btnModeSwitch   = document.getElementById('btn-mode-switch');
 
 // Shared UI
@@ -510,6 +511,47 @@ btnReset.addEventListener('click', () => {
   init();
 });
 
+if (btnRestartMap) {
+  btnRestartMap.addEventListener('click', () => {
+    if (!graph) return;
+    
+    stopLoop();
+    isRunning = false;
+    isBlockTool = false;
+    btnStartPause.textContent = '▶ Bắt đầu';
+    btnStartPause.classList.remove('btn-pause');
+    setBlockToolActive(false);
+
+    if (chartMgr) {
+      chartMgr.destroy();
+      chartMgr = new ChartManager('line-chart');
+      chartMgr.initialize();
+    }
+
+    // Xoá vết mùi và tắc đường, nhưng giữ nguyên vị trí thành phố
+    graph.resetPheromones();
+    graph.blockedEdges.clear();
+    graph._computeDistances(); 
+    
+    aco = new ACOEngine(graph, { numAnts: NUM_ANTS });
+    qlAgent = new QLearningAgent();
+    if (mode === 'ddpg') {
+      env = new TSPEnvironment(graph, aco);
+      env.reset();
+      if (ddpgAgent) ddpgAgent.resetNoise();
+    }
+
+    generation = 0;
+    bestPath = null;
+    bestCost = Infinity;
+    genSinceLastTrain = 0;
+
+    renderer.render(graph, bestPath, { generation, bestCost });
+    updateUI();
+    showToast('⏪ Đã khôi phục map hiện tại về Gen 0!');
+  });
+}
+
 btnModeSwitch.addEventListener('click', async () => {
   const next = mode === 'ql' ? 'ddpg' : 'ql';
   await switchMode(next);
@@ -682,14 +724,22 @@ function showTestResults(results) {
   });
 }
 
-// Canvas click — tắc đường
+// Canvas click — tắc đường (chỉ cho phép trên cạnh thuộc bestPath)
 mainCanvas.addEventListener('click', (e) => {
   if (!isBlockTool || !graph) return;
+
+  // Chưa có lộ trình tối ưu nào → không cho tắc đường
+  if (!bestPath || bestPath.length < 2) {
+    showToast('⏳ Hãy chạy mô phỏng trước để tìm lộ trình tối ưu!');
+    return;
+  }
+
   const rect = mainCanvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left) * (mainCanvas.width / rect.width);
   const my = (e.clientY - rect.top)  * (mainCanvas.height / rect.height);
 
-  const edge = renderer.findNearestEdge(graph, mx, my, 18);
+  // Chỉ tìm cạnh trên lộ trình tối ưu hiện tại
+  const edge = renderer.findNearestEdgeOnPath(graph, bestPath, mx, my, 18);
   if (edge) {
     const blocked = graph.blockEdge(edge.i, edge.j);
     if (blocked) {
@@ -698,31 +748,33 @@ mainCanvas.addEventListener('click', (e) => {
       } else if (env) {
         env.triggerTrafficEvent();
       }
-      showToast(`⚠️ Tắc đường: cạnh ${edge.i}↔${edge.j} (×${graph.TRAFFIC_MULTIPLIER})`);
-      if (bestPath) {
-        const affectsPath = bestPath.some((v, k) => {
-          if (k >= bestPath.length - 1) return false;
-          const a = bestPath[k], b = bestPath[k+1];
-          return (a === edge.i && b === edge.j) || (a === edge.j && b === edge.i);
-        });
-        if (affectsPath) bestCost = Infinity;
-      }
+      // Cạnh bị tắc nằm trên bestPath → reset cost để AI học lại
+      bestCost = Infinity;
+      showToast(`🚧 Tắc đường trên lộ trình tối ưu: cạnh ${edge.i}↔${edge.j} (chi phí ×${graph.TRAFFIC_MULTIPLIER})`);
     } else {
-      showToast('Cạnh này đã bị tắc đường rồi!');
+      showToast('⚠️ Cạnh này đã bị tắc đường rồi!');
     }
     renderer.render(graph, bestPath, { generation, bestCost });
+  } else {
+    showToast('🖱️ Click vào đường vàng (lộ trình tối ưu) để tắc đường!');
   }
 });
 
-// Canvas hover
+// Canvas hover — chỉ đổi cursor khi hover đúng vào cạnh thuộc bestPath
 mainCanvas.addEventListener('mousemove', (e) => {
   if (!graph || !renderer) return;
   const rect = mainCanvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left) * (mainCanvas.width / rect.width);
   const my = (e.clientY - rect.top)  * (mainCanvas.height / rect.height);
   if (isBlockTool) {
-    const edge = renderer.findNearestEdge(graph, mx, my, 15);
-    mainCanvas.style.cursor = edge ? 'crosshair' : 'default';
+    if (!bestPath || bestPath.length < 2) {
+      // Chưa có lộ trình → cursor ban đầu (không cho phép click)
+      mainCanvas.style.cursor = 'not-allowed';
+    } else {
+      // Chỉ crosshair khi đúng trên cạnh vàng của bestPath
+      const onPath = renderer.isHoveringPathEdge(graph, bestPath, mx, my, 15);
+      mainCanvas.style.cursor = onPath ? 'crosshair' : 'default';
+    }
   } else {
     mainCanvas.style.cursor = 'default';
   }
@@ -734,8 +786,15 @@ mainCanvas.addEventListener('mousemove', (e) => {
 function setBlockToolActive(active) {
   isBlockTool = active;
   btnBlockTool.classList.toggle('tool-active', active);
-  btnBlockTool.textContent = active ? '🚫 Đang chọn cạnh...' : '🚧 Tạo Tắc Đường';
-  mainCanvas.style.cursor = active ? 'crosshair' : 'default';
+  btnBlockTool.textContent = active ? '🚫 Click vào đường vàng...' : '🚧 Tạo Tắc Đường';
+  // Khi bật tool: nếu chưa có bestPath thì cursor not-allowed, ngược lại để default
+  // (mousemove sẽ tự đổi thành crosshair khi hover đúng cạnh)
+  mainCanvas.style.cursor = active ? (bestPath ? 'default' : 'not-allowed') : 'default';
+  if (active && (!bestPath || bestPath.length < 2)) {
+    showToast('⏳ Hãy chạy mô phỏng để tìm lộ trình tối ưu trước!');
+  } else if (active) {
+    showToast('🖱️ Click vào đường vàng (lộ trình tối ưu) để chặn cạnh đó!');
+  }
 }
 
 function showToast(msg) {

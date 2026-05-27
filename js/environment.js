@@ -123,26 +123,30 @@ export class TSPEnvironment {
    *   3. Entropy pheromone (thưởng đa dạng, phạt lock-in)
    */
   _computeReward(roundCost) {
+    if (this.trafficTriggered) {
+      this.trafficTriggered = false;
+      return 0; // Vừa có biến động lớn, nhường cho vòng sau đánh giá dựa trên trạng thái mới
+    }
+
     if (!isFinite(this.prevBestCost) || this.prevBestCost === Infinity) {
       return 1;
     }
 
-    const { ALPHA_MIN, ALPHA_MAX, RHO_MIN, RHO_MAX } = DDPG_CONSTANTS;
+    const { ALPHA_MIN, ALPHA_MAX, RHO_MIN, RHO_MAX, STUCK_THRESHOLD } = DDPG_CONSTANTS;
     const improvementRate = (this.prevBestCost - roundCost) / this.prevBestCost;
 
-    // ── 1. Phần thưởng kết quả ACO ────────────────────────────────
-    if (this.trafficTriggered && roundCost > this.allTimeBest * 1.10) {
-      this.trafficTriggered = false;
-      return -15;
-    }
-    this.trafficTriggered = false;
-
     let reward = 0;
-    if      (improvementRate > 0.05)  reward = +20;
-    else if (improvementRate > 0)     reward = +10;
-    else if (this.stuckCounter >= DDPG_CONSTANTS.STUCK_THRESHOLD) reward = -5;
-    else if (roundCost <= this.allTimeBest * 1.02) reward = +2;
-    else    reward = -1;
+    
+    // Nếu cost vượt quá 3000, chắc chắn kiến đang đi vào đường cấm (do cost x100)
+    if (roundCost > 3000) {
+      reward -= 20; // Phạt cực nặng để ép phải đổi đường
+    } else {
+      if      (improvementRate > 0.05)  reward = +20;
+      else if (improvementRate > 0)     reward = +10;
+      else if (this.stuckCounter >= 5)  reward = -10; // Phạt nặng nếu kẹt quá lâu
+      else if (roundCost <= this.allTimeBest * 1.05) reward = +3;
+      else    reward = -2;
+    }
 
     // ── 2. Sức khoẻ tham số (bell-curve, đỉnh tại vùng trung tâm) ──
     // Alpha: vùng tốt nhất là [0.8, 1.8] — phạt cả quá thấp lẫn quá cao

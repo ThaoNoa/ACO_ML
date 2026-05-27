@@ -45,7 +45,21 @@ export class HeadlessTrainer {
 
       if (this.env.stuckCounter >= 12) this.graph.resetPheromones();
 
-      const { bestCost: roundCost } = this.aco.runIteration();
+      const { bestPath, bestCost: roundCost } = this.aco.runIteration();
+
+      // MÔ PHỎNG TẮC ĐƯỜNG ĐỂ DẠY AI PHẢN XẠ
+      // Mỗi 200 vòng, chọn 1 cạnh trên đường tốt nhất hiện tại và chặn nó lại
+      if (gen > 0 && gen % 200 === 0 && bestPath && bestPath.length > 2) {
+        const idx = Math.floor(Math.random() * (bestPath.length - 1));
+        this.graph.blockEdge(bestPath[idx], bestPath[idx + 1]);
+        this.env.triggerTrafficEvent();
+      }
+      // Sau 50 vòng kể từ lúc tắc, xoá tắc đường để môi trường bình thường trở lại
+      if (gen > 0 && gen % 200 === 50) {
+        this.graph.clearAllBlockedEdges();
+        this.env.triggerTrafficEvent();
+      }
+
       const { reward, nextState } = this.env.step(roundCost, alpha, rho);
       
       this.agent.remember(state, rawAction, reward, nextState);

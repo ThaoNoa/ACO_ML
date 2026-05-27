@@ -14,29 +14,29 @@ export const TEST_CASES = [
   },
   {
     id: 'TC2',
-    name: 'Hard Traffic (N=10) - 1 Edge',
-    nodes: 10,
+    name: 'Hard Traffic (N=12) - 1 Edge',
+    nodes: 12,
     traffic: [{ type: 'hard', edge: [1, 3] }] // Tắc vĩnh viễn cạnh (1,3)
   },
   {
     id: 'TC3',
-    name: 'Hard Traffic (N=10) - 2 Edges',
-    nodes: 10,
+    name: 'Hard Traffic (N=12) - 2 Edges',
+    nodes: 12,
     traffic: [{ type: 'hard', edge: [2, 5] }, { type: 'hard', edge: [4, 7] }]
   },
   {
     id: 'TC4',
-    name: 'Dynamic Traffic (N=10) - 1 Edge',
-    nodes: 10,
-    traffic: [{ type: 'dynamic', gen: 50, edge: [1, 4] }] // Xuất hiện tắc ở gen 50
+    name: 'Dynamic Traffic (N=12) - 1 Edge',
+    nodes: 12,
+    traffic: [{ type: 'dynamic', gen: 10, edge: [1, 4] }] // Xuất hiện tắc ở gen 10
   },
   {
     id: 'TC5',
-    name: 'Dynamic Traffic (N=10) - 2 Edges',
-    nodes: 10,
+    name: 'Dynamic Traffic (N=12) - 2 Edges',
+    nodes: 12,
     traffic: [
-      { type: 'dynamic', gen: 50, edge: [3, 6] },
-      { type: 'dynamic', gen: 100, edge: [2, 8] }
+      { type: 'dynamic', gen: 10, edge: [3, 6] },
+      { type: 'dynamic', gen: 20, edge: [2, 8] }
     ]
   }
 ];

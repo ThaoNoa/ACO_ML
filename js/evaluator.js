@@ -18,7 +18,7 @@ export class Evaluator {
    */
   async runTestSuite(ddpgAgent, onProgress = null) {
     const results = [];
-    const MAX_GENS = 500; // Đánh giá mỗi test case trong 500 gen
+    const MAX_GENS = 40; // 40 gen để có thời gian phản ứng tắc đường
 
     for (let i = 0; i < TEST_CASES.length; i++) {
       const tc = TEST_CASES[i];
@@ -60,7 +60,7 @@ export class Evaluator {
   async _runAgent(tc, mode, baseGraph, ddpgAgent, maxGens) {
     // Clone graph để tránh ảnh hưởng chéo
     const graph = this._cloneGraph(baseGraph);
-    const aco = new ACOEngine(graph, { numAnts: 30 });
+    const aco = new ACOEngine(graph, { numAnts: 30 }); // Phục hồi 30 kiến để khớp với môi trường lúc train
     
     let env = null;
     let ql = null;
