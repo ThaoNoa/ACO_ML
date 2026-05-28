@@ -20,7 +20,7 @@ export class Graph {
     this.PHEROMONE_INIT = 0.1;
     this.PHEROMONE_MIN  = 0.001;
     this.PHEROMONE_MAX  = 10.0;
-    this.TRAFFIC_MULTIPLIER = 100;
+    this.TRAFFIC_MULTIPLIER = 1000;
   }
 
   /**

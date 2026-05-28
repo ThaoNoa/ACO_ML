@@ -17,6 +17,7 @@ import { Renderer }       from './renderer.js';
 import { ChartManager }   from './chart_manager.js';
 import { HeadlessTrainer } from './trainer.js';
 import { Evaluator }       from './evaluator.js';
+import { runExperiment, exportResults } from './experiment.js';
 
 // =====================================================================
 // CONSTANTS
@@ -834,6 +835,39 @@ window.addEventListener('DOMContentLoaded', () => {
   if (ddpgPanel) ddpgPanel.classList.add('panel-hidden');
 
   init();
+
+  // Nút chạy thí nghiệm
+  const btnRunExperiment = document.getElementById('btn-run-experiment');
+  if (btnRunExperiment) {
+      btnRunExperiment.addEventListener('click', async () => {
+          btnRunExperiment.disabled = true;
+          btnRunExperiment.textContent = '⏳ Đang chạy thí nghiệm...';
+          showToast('Chạy thí nghiệm 1000 gen, quá trình có thể mất vài phút.');
+
+          // Dynamically import module experiment
+          const { runExperiment, exportResults } = await import('./experiment.js');
+
+          // Chạy lần lượt baseline, QL, DDPG
+          const baseline = await runExperiment('baseline', (gen, cost) => {
+              console.log(`Baseline gen ${gen}: cost ${cost.toFixed(1)}`);
+          });
+          exportResults(baseline, 'baseline_aco.json');
+
+          const ql = await runExperiment('ql', (gen, cost) => {
+              console.log(`QL gen ${gen}: cost ${cost.toFixed(1)}`);
+          });
+          exportResults(ql, 'ql_aco.json');
+
+          const ddpg = await runExperiment('ddpg', (gen, cost) => {
+              console.log(`DDPG gen ${gen}: cost ${cost.toFixed(1)}`);
+          });
+          exportResults(ddpg, 'ddpg_aco.json');
+
+          btnRunExperiment.disabled = false;
+          btnRunExperiment.textContent = '🧪 Chạy thí nghiệm (1000 gen)';
+          showToast('Hoàn tất! Đã tải xuống 3 file JSON.');
+      });
+  }
 
   // Animation loop liên tục ngay cả khi pause
   function animLoop() {

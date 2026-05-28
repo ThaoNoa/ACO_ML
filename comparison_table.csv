@@ -1,0 +1,4 @@
+Tiêu chí,ACO Truyền thống,ACO + Q-Learning,ACO + DDPG (Đề xuất)
+Chi phí trung bình (Tĩnh),2519.9,2556.7,2621.0
+Chi phí trung bình (Động),2522.8,2561.0,2623.7
+Số thế hệ hội tụ,6,9,4
