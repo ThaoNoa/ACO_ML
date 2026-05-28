@@ -1,151 +1,102 @@
-# SmartRoute v3 — Hệ thống Điều phối Logistics Thích ứng
+# TỔNG QUAN DỰ ÁN DÀNH CHO DEVELOPER (DEVELOPER GUIDE)
 
-> **Dynamic TSP** giải quyết bằng **ACO (Ant Colony Optimization)** kết hợp 2 bộ não AI có thể chuyển đổi qua lại:
-> - **Q-Learning (Tabular)** — 3 trạng thái × 3 hành động rời rạc
-> - **DDPG (Deep Reinforcement Learning)** — điều chỉnh liên tục tham số Alpha/Rho bằng mạng Neural Network
+Tài liệu này cung cấp cái nhìn toàn diện về kiến trúc mã nguồn, luồng dữ liệu (data flow), và logic thuật toán của dự án **SmartRoute v3**. Dự án là sự kết hợp giữa thuật toán Đàn kiến (ACO) và Học tăng cường (Q-Learning & DDPG) để giải quyết bài toán Dynamic TSP.
 
 ---
 
-## ⚙️ Yêu cầu phần mềm
+## 1. Cấu trúc Thư mục & Vai trò các File
 
-| Phần mềm | Phiên bản tối thiểu | Link tải |
-|---|---|---|
-| **Node.js** | v18 trở lên | https://nodejs.org (chọn bản LTS) |
-| Trình duyệt | Chrome / Edge / Firefox mới nhất | — |
+Mã nguồn frontend hoàn toàn dùng Vanilla JavaScript (ES6 Modules) để đạt hiệu năng cao nhất trên trình duyệt. TensorFlow.js được dùng để thiết kế Mạng Neural.
 
-> **Lưu ý:** Dự án này **không cần Python** để chạy giao diện web nữa (phiên bản cũ dùng `server.py`, phiên bản v3 đã chuyển sang Vite + Node.js). Các file Python (`main.py`, `aco_engine.py`, v.v.) là phiên bản console cũ, vẫn được giữ lại để tham khảo.
-
----
-
-## 🚀 Cài đặt & Chạy
-
-### Bước 1: Cài Node.js
-Tải và cài đặt từ https://nodejs.org (chọn **LTS**). Sau khi cài, khởi động lại máy tính (hoặc ít nhất là khởi động lại terminal/IDE).
-
-Kiểm tra cài đặt thành công:
-```powershell
-node --version   # Phải ra: v18.x.x hoặc cao hơn
-npm --version    # Phải ra: 9.x.x hoặc cao hơn
-```
-
-### Bước 2: Mở PowerShell và cấp quyền chạy script (chỉ cần làm 1 lần)
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-```
-
-### Bước 3: Cài thư viện
-```powershell
-cd "E:\Python Projects\Ant_Colony_QL_DQN"
-npm install
-```
-Lệnh này sẽ tải về `@tensorflow/tfjs` (thư viện AI) và `vite` (web server). Chỉ cần chạy **một lần duy nhất**.
-
-### Bước 4: Khởi động
-```powershell
-npm run dev
-```
-Mở trình duyệt và truy cập: **http://localhost:5173/**
+- `index.html`: Chứa cấu trúc UI, Canvas và tích hợp thư viện Chart.js.
+- `js/app.js`: File Orchestrator (Nhạc trưởng). Quản lý Game Loop (chạy liên tục qua `requestAnimationFrame`), xử lý DOM events, cập nhật UI và chuyển đổi giữa 2 chế độ (QL / DDPG).
+- `js/graph.js`: Quản lý Đồ thị, tạo tọa độ ngẫu nhiên, ma trận khoảng cách, ma trận pheromone và chức năng chặn đường (Block Edge).
+- `js/aco.js`: Chứa thuật toán ACO (Logic con kiến bò). Có thể nhận tham số $\alpha, \rho$ động từ bên ngoài đưa vào.
+- `js/qlearning.js`: Chứa thuật toán Học tăng cường dạng bảng (Tabular Q-Learning).
+- `js/ddpg_agent.js`: Chứa tác tử DDPG (Actor-Critic) dùng TensorFlow.js. Quản lý 4 mạng Neural, Replay Buffer và quá trình Backpropagation.
+- `js/environment.js`: Đóng vai trò là Môi trường (Gym-like Environment) cho DDPG. Nó trích xuất 10 thông số từ `graph` + `aco` để tạo thành State, tính toán Reward và phạt AI khi có tắc đường.
+- `js/trainer.js`: Chạy DDPG ở chế độ Headless (không render giao diện) để huấn luyện nhanh 2000 vòng, mô phỏng cả tắc đường để AI học.
+- `js/evaluator.js`: Chứa Test Suite, chạy so sánh tự động giữa Q-Learning và DDPG.
+- `js/renderer.js`: Chịu trách nhiệm vẽ Canvas (đường thẳng, node, xe cộ, hiệu ứng hover, vết mùi).
 
 ---
 
-## 🎮 Hướng dẫn sử dụng
+## 2. Luồng Logic Chính (App Loop)
 
-| Nút | Chức năng |
-|---|---|
-| ▶ **Bắt đầu** | Khởi động / tiếp tục mô phỏng |
-| ⏸ **Tạm dừng** | Tạm dừng |
-| 🚧 **Tạo Tắc Đường** | Click vào để kích hoạt, sau đó click vào cạnh bất kỳ trên bản đồ để chặn đường (chi phí ×100) |
-| ❌ **Xoá Tắc Đường** | Gỡ bỏ toàn bộ điểm tắc nghẽn, AI học lại từ đầu |
-| 🔄 **Khởi tạo lại** | Tạo bản đồ mới ngẫu nhiên |
-| **🧠 Mode Switch** (header) | Chuyển đổi giữa Q-Learning ↔ DDPG |
-| ⚡ **Train DDPG (Fast)** | Huấn luyện DDPG 2,000 thế hệ ở chế độ nhanh (không render đồ họa) — **nên làm trước khi chạy DDPG** |
-| 💾 **Export** | Lưu trọng số mạng Neural xuống máy tính (2 file: `.json` + `.bin`) |
-| 📂 **Import** | Tải lại trọng số đã lưu (chọn cả 2 file cùng lúc) |
-| 📊 **Run Test Suite** | Chạy 5 bài test chuẩn và so sánh độ chính xác QL-ACO vs DDPG so với đường tối ưu (Brute-force) |
-
-### Luồng sử dụng DDPG đề xuất:
-1. Nhấn **Mode Switch** để chuyển sang DDPG
-2. Nhấn **⚡ Train DDPG (Fast)** — đợi 2–5 giây
-3. Nhấn **▶ Bắt đầu** để xem kết quả thực chiến
-4. Thêm tắc đường bằng **🚧 Tạo Tắc Đường** và quan sát AI phản ứng
-5. (Tuỳ chọn) Nhấn **💾 Export** để lưu lại model xịn
+Trái tim của ứng dụng nằm ở vòng lặp `startLoop()` trong `app.js`. Nó chạy mỗi $120ms$ theo luồng sau:
+1. **Lấy Trạng thái (Get State):** `env.getState()` lấy 10 thông số bản đồ.
+2. **Ra Quyết định (Action):** DDPG Agent / QL Agent dựa vào State để xuất ra $\alpha, \rho$.
+3. **Áp dụng (Apply):** `aco.setParams(alpha, rho)`.
+4. **Mô phỏng 1 Vòng (Simulate):** Đàn kiến chạy (`aco.runIteration()`), nhả mùi lên `graph`.
+5. **Nhận Thưởng (Reward):** Tính toán xem điểm số tối ưu có tốt lên không $\rightarrow$ Cập nhật lại Agent.
+6. **Vẽ lại (Render):** `renderer.render(...)` xuất đồ họa ra màn hình.
 
 ---
 
-## 📁 Cấu trúc dự án
+## 3. Core Logic: Thuật toán Đàn kiến (ACO)
 
-```
-Ant_Colony_QL_DQN/
-│
-├── index.html              # Entry point — giao diện web chính
-├── package.json            # Cấu hình npm (TF.js + Vite)
-├── vite.config.js          # Cấu hình Vite dev server
-│
-├── css/
-│   └── style.css           # Design system (glassmorphism, dark theme)
-│
-├── js/
-│   ├── graph.js            # [DATA]  Đồ thị: nodes, khoảng cách, ma trận pheromone
-│   ├── aco.js              # [ALGO]  ACO Engine: đàn kiến, elitist strategy
-│   ├── qlearning.js        # [AI-1]  Q-Learning Agent (tabular, 3×3)
-│   ├── environment.js      # [AI-2]  Môi trường DDPG: state vector 10D, reward
-│   ├── ddpg_agent.js       # [AI-2]  DDPG Agent: Actor-Critic, Replay Buffer, OU Noise
-│   ├── trainer.js          # [AI-2]  Headless Trainer: train nhanh không render
-│   ├── test_suite.js       # [EVAL]  5 Test Cases cố định + Brute-force solver
-│   ├── evaluator.js        # [EVAL]  Chạy test tự động, so sánh QL vs DDPG
-│   ├── renderer.js         # [VIEW]  Canvas renderer: bản đồ, glow, particles
-│   ├── chart_manager.js    # [VIEW]  Chart.js: biểu đồ hội tụ real-time
-│   └── app.js              # [CTRL]  Orchestrator: vòng lặp, events, UI update
-│
-├── server.py               # (Cũ) HTTP server Python — không cần dùng nữa
-├── main.py                 # (Cũ) Console demo ACO+QL bằng Python
-└── aco_engine.py           # (Cũ) ACO Engine Python — tham khảo
-```
+Nằm trong `js/aco.js`. Mỗi con kiến trong số `NUM_ANTS = 30` sẽ xây dựng lộ trình dựa trên công thức xác suất chọn node tiếp theo:
+
+$$ P_{ij} = \frac{[\tau_{ij}]^\alpha \cdot [\eta_{ij}]^\beta}{\sum [\tau_{ik}]^\alpha \cdot [\eta_{ik}]^\beta} $$
+
+*Các biến quan trọng:*
+- `this.alpha`: Trọng số vết mùi $\tau$ (Được AI điều khiển liên tục).
+- `this.beta = 2.0`: Trọng số khoảng cách $\eta$ (Cố định). $\eta = 1/d$.
+- `this.rho`: Tốc độ bay hơi (Được AI điều khiển liên tục).
+- Cập nhật Pheromone: $\tau_{ij} = (1-\rho)\tau_{ij} + \sum \Delta \tau_{ij}$
 
 ---
 
-## 🧠 Thuật toán
+## 4. Core Logic: Môi trường & State Vector (environment.js)
 
-### ACO Engine (`aco.js`)
-- **30 kiến** mỗi generation, bắt đầu từ depot (node 0)
-- Chọn node kế tiếp: `P(i→j) ∝ τ(i,j)^α × η(i,j)^β`  
-  (`τ`: pheromone, `η = 1/cost`: heuristic khoảng cách)
-- **Elitist strategy**: top 30% kiến + kiến tốt nhất deposit mạnh hơn
-- Bay hơi: `τ *= (1 - ρ)` sau mỗi iteration
+Để Mạng Neural hiểu được bản đồ, `TSPEnvironment` nén toàn bộ đồ thị thành một vector số thực 10 chiều (10-Dimensional Array).
 
-### Q-Learning Agent (`qlearning.js`)
+*Các biến trong State (Values từ 0.0 đến 1.0):*
+1. `normBestCost`: Chi phí tốt nhất (Chuẩn hóa so với kỷ lục).
+2. `improvementRate`: $\%$ cải thiện so với vòng trước.
+3. `stuckNorm`: Điểm số phạt nếu nhiều vòng không tìm được đường mới.
+4. `avgPhero`: Lượng mùi trung bình của toàn bản đồ.
+5. `stdPhero`: Độ phân tán của mùi.
+6. `blockedRatio`: Tỷ lệ các đoạn đường đang bị tắc (`graph.blockedEdges.size / totalEdges`).
+7. `alphaNorm`: $\alpha$ vòng trước (chuẩn hóa).
+8. `rhoNorm`: $\rho$ vòng trước (chuẩn hóa).
+9. `genProgress`: Chu kỳ thời gian.
+10. `normEntropy`: Độ hỗn loạn của mùi (Nếu bằng 0 tức là đàn kiến đang bám vào 1 đường duy nhất).
 
-| State | Điều kiện |
-|---|---|
-| S0: IMPROVING | Best distance đang giảm |
-| S1: STUCK | ≥10 gen không có kỷ lục mới |
-| S2: DEGRADED | Tắc đường hoặc distance tăng đột ngột |
-
-| Action | Alpha | Rho | Chiến lược |
-|---|---|---|---|
-| A0: Duy trì | 1.0 | 0.10 | Ổn định |
-| A1: Khám phá | 0.5 | 0.80 | Xóa mùi cũ, tìm đường mới |
-| A2: Khai thác | 2.0 | 0.05 | Bám chặt lộ trình tốt |
-
-### DDPG Agent (`ddpg_agent.js` + `environment.js`)
-- **Actor**: `state(10D)` → Dense(256) → Dense(256) → Dense(128) → `tanh(2)` → `{alpha, rho}`
-- **Critic**: `[state ∥ action]` → Dense(256) → Dense(256) → Dense(128) → `Q(1)`
-- **State vector 10D**: normalized_best_cost, improvement_rate, stuck_counter, avg_pheromone, std_pheromone, blocked_ratio, alpha_norm, rho_norm, gen_progress, pheromone_entropy
-- **Action space**: `alpha ∈ [0.5, 2.5]`, `rho ∈ [0.02, 0.5]` (liên tục)
-- **Replay Buffer**: 5,000 transitions, batch size 64
-- **OU Noise**: khám phá (σ giảm dần từ 0.3 → 0.05)
+*Hàm phần thưởng cốt lõi `_computeReward(roundCost)`:*
+- **Phạt tắc đường:** Nếu kiến đâm vào đường tắc (`roundCost > 3000`), trả về luôn `-20` điểm.
+- **Thưởng tiến bộ:** Nếu chi phí đường đi giảm, nhận `+10` đến `+20`.
+- **Phạt kẹt (Stuck):** Kẹt cứng quá 5 vòng nhận `-10`.
 
 ---
 
-## ✨ Tính năng nổi bật
+## 5. Core Logic: Deep RL (ddpg_agent.js)
 
-- ✅ **2 chế độ AI** chuyển đổi nóng (Q-Learning ↔ DDPG) mà không cần reload
-- ✅ **Headless Training**: Train DDPG 2,000 gen trong vài giây, không cần render
-- ✅ **Export / Import Model**: Lưu và tải lại trọng số Neural Network
-- ✅ **Test Suite tự động**: 5 bài test (N=8, N=10) với Brute-force optimal làm chuẩn
-- ✅ **Tắc đường real-time**: Click cạnh → đỏ + ×100 chi phí → AI phản ứng ngay
-- ✅ **Xoá tắc đường**: Gỡ toàn bộ điểm tắc nghẽn một lần, AI reset baseline
-- ✅ **Pheromone động**: Cạnh đậm hơn = pheromone cao hơn
-- ✅ **Particle kiến**: Hiệu ứng kiến chạy dọc lộ trình tốt nhất
-- ✅ **State Vector hiển thị**: 10 chiều DDPG được visualize bằng thanh mini real-time
-- ✅ **Biểu đồ kép**: Best Distance + Reward trên cùng chart
+Sử dụng thư viện `@tensorflow/tfjs`. DDPG là một thuật toán Off-policy, Actor-Critic.
+
+### 5.1. Kiến trúc Mạng Neural
+- **Actor Network (Người ra quyết định):**
+  - Input: Tensor 1D (Size 10) $\rightarrow$ Dense (256, ReLU) $\rightarrow$ Dense (256, ReLU) $\rightarrow$ Dense (128, ReLU) $\rightarrow$ Output: Tensor 1D (Size 2, Tanh).
+  - Tanh giới hạn đầu ra trong khoảng $[-1, 1]$, sau đó được map thành $\alpha \in [0.5, 2.5]$ và $\rho \in [0.02, 0.5]$.
+- **Critic Network (Trọng tài đánh giá):**
+  - Input: Nối ghép State (10) + Action từ Actor (2) = Tensor 1D (Size 12).
+  - Kiến trúc tương tự Actor $\rightarrow$ Output: 1 Q-Value tuyến tính (Linear).
+
+### 5.2. Luồng Huấn luyện (Backpropagation)
+- Dữ liệu lưu vào mảng `ReplayBuffer` (chứa các bộ `<State, Action, Reward, NextState>`).
+- Lấy ngẫu nhiên Batch 64 mẫu (Batch Size).
+- **Học Critic:** Tính Target Q = Reward + $\gamma \cdot Q'(NextState, \mu'(NextState))$. Dùng Gradient Descent giảm MSE Loss giữa Q dự đoán và Target Q.
+- **Học Actor:** Tính Gradient của Critic theo Action, nhân ngược (chain rule) vào Actor để Actor tìm ra Action đẩy Q-value lên mức tối đa. Hàm mất mát của Actor: `-tf.mean(Q)`.
+- Cập nhật mạng Target (Polyak Averaging) với $\tau = 0.005$.
+
+### 5.3. OU Noise (Ornstein-Uhlenbeck)
+- Là hàm tạo nhiễu ngẫu nhiên có quán tính, giúp AI khám phá môi trường. Thanh "Noise" trên UI hiển thị biên độ của OU Noise. Qua mỗi bước học, nhiễu giảm dần (Decay) để AI ổn định khai thác (Exploitation).
+
+---
+
+## 6. Logic giả lập tắc đường trong lúc Train (`trainer.js`)
+
+Để đảm bảo Actor Network thực sự biết cách đối phó với giao thông động, `HeadlessTrainer` chạy ngầm và tự động ép các tình huống xấu:
+- Cứ mỗi 200 Generation: Nó lấy đường đi tối ưu (`bestPath`), trích xuất ngẫu nhiên 1 đoạn thẳng, và gọi hàm `graph.blockEdge(u, v)`.
+- Lúc này chi phí đi qua đoạn thẳng đó bị x100. Môi trường sẽ nhận thấy và ném `-20` điểm phạt thẳng vào mặt Actor nếu Actor không chịu nhả $\rho$ để kiến chuyển hướng.
+- Sau 50 Generation: Gọi `graph.clearAllBlockedEdges()` để trả lại bản đồ bình thường. Quá trình này lặp lại 10 lần (2000 vòng) giúp AI tôi luyện tính linh hoạt.
